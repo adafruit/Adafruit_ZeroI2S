@@ -165,14 +165,14 @@ void loop() {
     // Pause for a tenth of a second between notes.
     delay(100);
   }
-    Serial.println("Triangle wave");
+  Serial.println("Triangle wave");
   for (int i=0; i<sizeof(scale)/sizeof(float); ++i) {
     // Play the note for a quarter of a second.
     playWave(triangle, WAV_SIZE, scale[i], 0.25);
     // Pause for a tenth of a second between notes.
     delay(100);
   }
-    Serial.println("Square wave");
+  Serial.println("Square wave");
   for (int i=0; i<sizeof(scale)/sizeof(float); ++i) {
     // Play the note for a quarter of a second.
     playWave(square, WAV_SIZE, scale[i], 0.25);
