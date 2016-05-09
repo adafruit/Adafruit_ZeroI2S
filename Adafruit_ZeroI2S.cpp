@@ -83,6 +83,7 @@ bool Adafruit_ZeroI2S_TX::configure(uint8_t numChannels, uint32_t sampleRateHz, 
   // to the SCK frequency.
   gclk_generator.source_clock = SYSTEM_CLOCK_SOURCE_DFLL;
   gclk_generator.division_factor = F_CPU / (sampleRateHz*numChannels*bitsPerSample);
+  DEBUG_PRINT("I2S gclk divisor: "); DEBUG_PRINTLN(gclk_generator.division_factor, DEC);
   // Set the GCLK generator config and enable it.
   system_gclk_gen_set_config(_gclk, &gclk_generator);
   system_gclk_gen_enable(_gclk);

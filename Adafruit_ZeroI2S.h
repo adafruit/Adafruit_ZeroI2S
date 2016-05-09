@@ -39,7 +39,7 @@
 //#define DEBUG
 
 // Define where debug output is printed (the native USB port on the Zero).
-#define DEBUG_PRINTER SerialUSB
+#define DEBUG_PRINTER Serial
 
 
 class Adafruit_ZeroI2S_TX {
@@ -63,6 +63,17 @@ public:
   // Write a single sample to the I2S transmitter.  Will wait until the I2S
   // hardware is ready to receive the sample.
   void write(uint32_t data);
+
+  // Return true if the transmitter is in an underflow state (i.e. data isn't
+  // sent to it fast enough).
+  bool isUnderflow() {
+    return i2s_get_status(&_i2s_instance) & I2S_STATUS_TRANSMIT_UNDERRUN(_id);
+  }
+
+  // Clear any underflow flag.
+  void clearUnderflow() {
+    i2s_clear_status(&_i2s_instance, I2S_STATUS_TRANSMIT_UNDERRUN(_id));
+  }
 
 private:
   uint8_t _id;
