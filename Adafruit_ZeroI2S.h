@@ -20,11 +20,17 @@ public:
 
 	bool begin(I2SSlotSize width, int fs_freq, int mck_mult = 256);
 
+	void enableTx();
+	void disableTx();
+	void enableRx(uint8_t clk=0);
+	void disableRx();
 	void enableMCLK();
 	void disableMCLK();
 
 	bool txReady();
+	bool rxReady();
 	void write(int32_t left, int32_t right);
+	void read(int32_t *left, int32_t *right);
 
 private:
 	uint8_t _fs, _sck, _tx, _rx;

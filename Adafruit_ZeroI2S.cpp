@@ -65,16 +65,50 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 			I2S_TXCTRL_TXSAME_ZERO |
 			I2S_TXCTRL_TXDEFAULT_ZERO;
 
+	I2S->RXCTRL.reg = I2S_RXCTRL_DMA_SINGLE |
+			I2S_RXCTRL_MONO_STEREO |
+			I2S_RXCTRL_BITREV_MSBIT |
+			I2S_RXCTRL_EXTEND_ZERO |
+			I2S_RXCTRL_WORDADJ_RIGHT |
+			I2S_RXCTRL_DATASIZE(wordSize) |
+			I2S_RXCTRL_SLOTADJ_RIGHT |
+			I2S_RXCTRL_CLKSEL_CLK0 |
+			I2S_RXCTRL_SERMODE_RX;
+
 	while(I2S->SYNCBUSY.bit.ENABLE); //wait for sync
 	I2S->CTRLA.bit.ENABLE = 1;
 
+	return true;
+}
+
+void Adafruit_ZeroI2S::enableTx()
+{
 	I2S->CTRLA.bit.CKEN0 = 1;
 	while(I2S->SYNCBUSY.bit.CKEN0);
 
 	I2S->CTRLA.bit.TXEN = 1;
 	while(I2S->SYNCBUSY.bit.TXEN);
+}
 
-	return true;
+void Adafruit_ZeroI2S::disableTx()
+{
+	I2S->CTRLA.bit.TXEN = 0;
+	while(I2S->SYNCBUSY.bit.TXEN);
+}
+
+void Adafruit_ZeroI2S::enableRx(uint8_t clk)
+{
+	I2S->CTRLA.bit.CKEN0 = 1;
+	while(I2S->SYNCBUSY.bit.CKEN0);
+
+	I2S->CTRLA.bit.RXEN = 1;
+	while(I2S->SYNCBUSY.bit.RXEN);
+}
+
+void Adafruit_ZeroI2S::disableRx()
+{
+	I2S->CTRLA.bit.RXEN = 0;
+	while(I2S->SYNCBUSY.bit.RXEN);
 }
 
 void Adafruit_ZeroI2S::enableMCLK()
@@ -101,4 +135,13 @@ void Adafruit_ZeroI2S::write(int32_t left, int32_t right)
 	while( (!I2S->INTFLAG.bit.TXRDY0) || I2S->SYNCBUSY.bit.TXDATA );
 	I2S->INTFLAG.bit.TXUR0 = 1;
 	I2S->TXDATA.reg = right;
+}
+
+void Adafruit_ZeroI2S::read(int32_t *left, int32_t *right)
+{
+	while( (!I2S->INTFLAG.bit.RXRDY0) || I2S->SYNCBUSY.bit.RXDATA );
+	*left = I2S->RXDATA.reg;
+
+	while( (!I2S->INTFLAG.bit.RXRDY0) || I2S->SYNCBUSY.bit.RXDATA );
+	*right = I2S->RXDATA.reg;
 }
