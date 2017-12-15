@@ -17,8 +17,8 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 	//initialize clock control
 	MCLK->APBDMASK.reg |= MCLK_APBDMASK_I2S;
 
-	GCLK->PCHCTRL[I2S_GCLK_ID_0].reg = GCLK_PCHCTRL_GEN_GCLK2_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
-	GCLK->PCHCTRL[I2S_GCLK_ID_1].reg = GCLK_PCHCTRL_GEN_GCLK2_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+	GCLK->PCHCTRL[I2S_GCLK_ID_0].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+	GCLK->PCHCTRL[I2S_GCLK_ID_1].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
 
 	//software reset
 	I2S->CTRLA.bit.SWRST = 1;
@@ -29,8 +29,8 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 
 	//CLKCTRL[0] is used for the tx channel
 	I2S->CLKCTRL[0].reg = I2S_CLKCTRL_MCKSEL_GCLK |
-			I2S_CLKCTRL_MCKOUTDIV( (VARIANT_GCLK2_FREQ/mckFreq) - 1) |
-			I2S_CLKCTRL_MCKDIV((VARIANT_GCLK2_FREQ/sckFreq) - 1) |
+			I2S_CLKCTRL_MCKOUTDIV( (VARIANT_GCLK1_FREQ/mckFreq) - 1) |
+			I2S_CLKCTRL_MCKDIV((VARIANT_GCLK1_FREQ/sckFreq) - 1) |
 			I2S_CLKCTRL_SCKSEL_MCKDIV |
 			I2S_CLKCTRL_MCKEN |
 			I2S_CLKCTRL_FSSEL_SCKDIV |
