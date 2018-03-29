@@ -7,6 +7,8 @@ Adafruit_ZeroI2S::Adafruit_ZeroI2S() : _fs(PIN_I2S_FS), _sck(PIN_I2S_SCK), _tx(P
 
 bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 {
+#if defined(__SAMD51__)
+
 	pinPeripheral(_fs, PIO_I2S);
 	pinPeripheral(_sck, PIO_I2S);
 	pinPeripheral(_rx, PIO_I2S);
@@ -79,6 +81,76 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 	I2S->CTRLA.bit.ENABLE = 1;
 
 	return true;
+
+#else //SAMD21
+	uint32_t _clk_pin, _clk_mux, _data_pin, _data_mux;
+
+	// Clock pin, can only be one of 3 options
+	uint32_t clockport = g_APinDescription[_sck].ulPort;
+	uint32_t clockpin = g_APinDescription[_sck].ulPin;
+	if ((clockport == 0) && (clockpin == 10)) {
+		// PA10
+		_i2sclock = I2S_CLOCK_UNIT_0;
+		_clk_pin = PIN_PA10G_I2S_SCK0;
+		_clk_mux = MUX_PA10G_I2S_SCK0;
+	} else if ((clockport == 1) && (clockpin == 10)) {
+		// PB11
+		_i2sclock = I2S_CLOCK_UNIT_1;
+		_clk_pin = PIN_PB11G_I2S_SCK1;
+		_clk_mux = MUX_PB11G_I2S_SCK1;
+	} else if ((clockport == 0) && (clockpin == 20)) {
+		// PA20
+		_i2sclock = I2S_CLOCK_UNIT_0;
+		_clk_pin = PIN_PA20G_I2S_SCK0;
+		_clk_mux = MUX_PA20G_I2S_SCK0;
+	} else {
+		DEBUG_PRINTLN("Clock isnt on a valid pin");
+		return false;
+	}
+	pinPeripheral(_sck, (EPioType)_clk_mux);
+
+
+	// Data pin, can only be one of 3 options
+	uint32_t datapin = g_APinDescription[_rx].ulPin;
+	uint32_t dataport = g_APinDescription[_rx].ulPort;
+	if ((dataport == 0) && (datapin == 7)) {
+		// PA07
+		_i2sserializer = I2S_SERIALIZER_0;
+		_data_pin = PIN_PA07G_I2S_SD0;
+		_data_mux = MUX_PA07G_I2S_SD0;
+	} else if ((dataport == 0) && (datapin == 8)) {
+		// PA08
+		_i2sserializer = I2S_SERIALIZER_1;
+		_data_pin = PIN_PA08G_I2S_SD1;
+		_data_mux = MUX_PA08G_I2S_SD1;
+	} else if ((dataport == 0) && (datapin == 19)) {
+		// PA19
+		_i2sserializer = I2S_SERIALIZER_0;
+		_data_pin = PIN_PA19G_I2S_SD0;
+		_data_mux = MUX_PA19G_I2S_SD0;
+	} else {
+		DEBUG_PRINTLN("Data isnt on a valid pin");
+		return false;
+	}
+	pinPeripheral(_rx, (EPioType)_data_mux);
+
+	PM->APBCMASK.reg |= PM_APBCMASK_I2S;
+
+	/* Status check */
+	uint32_t ctrla = I2S->CTRLA.reg;
+	if (ctrla & I2S_CTRLA_ENABLE) {
+		if (ctrla & (I2S_CTRLA_SEREN1 |
+			 I2S_CTRLA_SEREN0 | I2S_CTRLA_CKEN1 | I2S_CTRLA_CKEN0)) {
+		  //return STATUS_BUSY;
+		  return false;
+		} else {
+		  //return STATUS_ERR_DENIED;
+		  return false;
+		}
+	}
+
+	return true;
+#endif
 }
 
 void Adafruit_ZeroI2S::enableTx()

@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 #include <Adafruit_ZeroI2S.h>
 #include <math.h>
 
@@ -25,6 +27,7 @@ void setup()
    * 44100 samples per second
    */
   i2s.begin(I2S_24_BIT, 44100);
+  i2s.enableTx();
 }
 
 void loop()
