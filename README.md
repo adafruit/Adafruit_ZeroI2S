@@ -1,10 +1,11 @@
 # Adafruit Zero I2S Library
 
-I2S audio playback library for the Arduino Zero / Adafruit Feather M0 (SAMD21 processor).
+I2S audio playback library for the Arduino Zero / Adafruit M0 (SAMD21 processor) -and- Adafruit M4 (SAMD51 processor) boards
 
-This library depends on the Adafruit ASF Core library from: https://github.com/adafruit/Adafruit_ASFcore
+
+Supports:
+-   DMA / interrupt support.  Uses the Adafruit ZeroDMA library to set up DMA transfers, see examples!
+-   Both Transmit (audio/speaker output) & Receive (audio/mic input) support.
 
 TODO:
--   DMA / interrupt support.  Only supports syncronous output for now.
--   Receive support.  Only supports audio transmit.
 -   MCLK output.  Only supports output for BCLK, LRCLK, and data.
