@@ -1,157 +1,223 @@
-// Adafruit Arduino Zero / Feather M0 I2S audio library.
-// Author: Tony DiCola
-//
-// The MIT License (MIT)
-//
-// Copyright (c) 2016 Adafruit Industries
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
 #include "Adafruit_ZeroI2S.h"
+#include "wiring_private.h"
+
+Adafruit_ZeroI2S::Adafruit_ZeroI2S(uint8_t FS_PIN, uint8_t SCK_PIN, uint8_t TX_PIN, uint8_t RX_PIN) : _fs(FS_PIN), _sck(SCK_PIN), _tx(TX_PIN), _rx(RX_PIN) {}
+
+Adafruit_ZeroI2S::Adafruit_ZeroI2S() : _fs(PIN_I2S_FS), _sck(PIN_I2S_SCK), _tx(PIN_I2S_SDO), _rx(PIN_I2S_SDI) {}
+
+bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
+{
+#if defined(__SAMD51__)
+
+	pinPeripheral(_fs, PIO_I2S);
+	pinPeripheral(_sck, PIO_I2S);
+	pinPeripheral(_rx, PIO_I2S);
+	pinPeripheral(_tx, PIO_I2S);
+
+	I2S->CTRLA.bit.ENABLE = 0;
+
+	//initialize clock control
+	MCLK->APBDMASK.reg |= MCLK_APBDMASK_I2S;
+
+	GCLK->PCHCTRL[I2S_GCLK_ID_0].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+	GCLK->PCHCTRL[I2S_GCLK_ID_1].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+
+	//software reset
+	I2S->CTRLA.bit.SWRST = 1;
+	while(I2S->SYNCBUSY.bit.SWRST || I2S->SYNCBUSY.bit.ENABLE); //wait for sync
+
+	uint32_t mckFreq = (fs_freq * mck_mult);
+	uint32_t sckFreq = fs_freq * I2S_NUM_SLOTS * ( (width + 1) << 3);
+
+	//CLKCTRL[0] is used for the tx channel
+	I2S->CLKCTRL[0].reg = I2S_CLKCTRL_MCKSEL_GCLK |
+			I2S_CLKCTRL_MCKOUTDIV( (VARIANT_GCLK1_FREQ/mckFreq) - 1) |
+			I2S_CLKCTRL_MCKDIV((VARIANT_GCLK1_FREQ/sckFreq) - 1) |
+			I2S_CLKCTRL_SCKSEL_MCKDIV |
+			I2S_CLKCTRL_MCKEN |
+			I2S_CLKCTRL_FSSEL_SCKDIV |
+			I2S_CLKCTRL_BITDELAY_I2S |
+			I2S_CLKCTRL_FSWIDTH_HALF |
+			I2S_CLKCTRL_NBSLOTS(I2S_NUM_SLOTS - 1) |
+			I2S_CLKCTRL_SLOTSIZE(width);
+
+	uint8_t wordSize;
+
+	switch(width){
+		case I2S_8_BIT:
+			wordSize = I2S_TXCTRL_DATASIZE_8_Val;
+			break;
+		case I2S_16_BIT:
+			wordSize = I2S_TXCTRL_DATASIZE_16_Val;
+			break;
+		case I2S_24_BIT:
+			wordSize = I2S_TXCTRL_DATASIZE_24_Val;
+			break;
+		case I2S_32_BIT:
+			wordSize = I2S_TXCTRL_DATASIZE_32_Val;
+			break;
+	}
+
+	I2S->TXCTRL.reg = I2S_TXCTRL_DMA_SINGLE |
+			I2S_TXCTRL_MONO_STEREO |
+			I2S_TXCTRL_BITREV_MSBIT |
+			I2S_TXCTRL_EXTEND_ZERO |
+			I2S_TXCTRL_WORDADJ_RIGHT |
+			I2S_TXCTRL_DATASIZE(wordSize) |
+			I2S_TXCTRL_TXSAME_ZERO |
+			I2S_TXCTRL_TXDEFAULT_ZERO;
+
+	I2S->RXCTRL.reg = I2S_RXCTRL_DMA_SINGLE |
+			I2S_RXCTRL_MONO_STEREO |
+			I2S_RXCTRL_BITREV_MSBIT |
+			I2S_RXCTRL_EXTEND_ZERO |
+			I2S_RXCTRL_WORDADJ_RIGHT |
+			I2S_RXCTRL_DATASIZE(wordSize) |
+			I2S_RXCTRL_SLOTADJ_RIGHT |
+			I2S_RXCTRL_CLKSEL_CLK0 |
+			I2S_RXCTRL_SERMODE_RX;
+
+	while(I2S->SYNCBUSY.bit.ENABLE); //wait for sync
+	I2S->CTRLA.bit.ENABLE = 1;
+
+	return true;
+
+#else //SAMD21
+	uint32_t _clk_pin, _clk_mux, _data_pin, _data_mux;
+
+	// Clock pin, can only be one of 3 options
+	uint32_t clockport = g_APinDescription[_sck].ulPort;
+	uint32_t clockpin = g_APinDescription[_sck].ulPin;
+	if ((clockport == 0) && (clockpin == 10)) {
+		// PA10
+		_i2sclock = I2S_CLOCK_UNIT_0;
+		_clk_pin = PIN_PA10G_I2S_SCK0;
+		_clk_mux = MUX_PA10G_I2S_SCK0;
+	} else if ((clockport == 1) && (clockpin == 10)) {
+		// PB11
+		_i2sclock = I2S_CLOCK_UNIT_1;
+		_clk_pin = PIN_PB11G_I2S_SCK1;
+		_clk_mux = MUX_PB11G_I2S_SCK1;
+	} else if ((clockport == 0) && (clockpin == 20)) {
+		// PA20
+		_i2sclock = I2S_CLOCK_UNIT_0;
+		_clk_pin = PIN_PA20G_I2S_SCK0;
+		_clk_mux = MUX_PA20G_I2S_SCK0;
+	} else {
+		DEBUG_PRINTLN("Clock isnt on a valid pin");
+		return false;
+	}
+	pinPeripheral(_sck, (EPioType)_clk_mux);
 
 
-// Define macros for debug output that optimize out when debug mode is disabled.
-#ifdef DEBUG
-  #define DEBUG_PRINT(...) DEBUG_PRINTER.print(__VA_ARGS__)
-  #define DEBUG_PRINTLN(...) DEBUG_PRINTER.println(__VA_ARGS__)
-#else
-  #define DEBUG_PRINT(...)
-  #define DEBUG_PRINTLN(...)
+	// Data pin, can only be one of 3 options
+	uint32_t datapin = g_APinDescription[_rx].ulPin;
+	uint32_t dataport = g_APinDescription[_rx].ulPort;
+	if ((dataport == 0) && (datapin == 7)) {
+		// PA07
+		_i2sserializer = I2S_SERIALIZER_0;
+		_data_pin = PIN_PA07G_I2S_SD0;
+		_data_mux = MUX_PA07G_I2S_SD0;
+	} else if ((dataport == 0) && (datapin == 8)) {
+		// PA08
+		_i2sserializer = I2S_SERIALIZER_1;
+		_data_pin = PIN_PA08G_I2S_SD1;
+		_data_mux = MUX_PA08G_I2S_SD1;
+	} else if ((dataport == 0) && (datapin == 19)) {
+		// PA19
+		_i2sserializer = I2S_SERIALIZER_0;
+		_data_pin = PIN_PA19G_I2S_SD0;
+		_data_mux = MUX_PA19G_I2S_SD0;
+	} else {
+		DEBUG_PRINTLN("Data isnt on a valid pin");
+		return false;
+	}
+	pinPeripheral(_rx, (EPioType)_data_mux);
+
+	PM->APBCMASK.reg |= PM_APBCMASK_I2S;
+
+	/* Status check */
+	uint32_t ctrla = I2S->CTRLA.reg;
+	if (ctrla & I2S_CTRLA_ENABLE) {
+		if (ctrla & (I2S_CTRLA_SEREN1 |
+			 I2S_CTRLA_SEREN0 | I2S_CTRLA_CKEN1 | I2S_CTRLA_CKEN0)) {
+		  //return STATUS_BUSY;
+		  return false;
+		} else {
+		  //return STATUS_ERR_DENIED;
+		  return false;
+		}
+	}
+
+	return true;
 #endif
-
-
-bool Adafruit_ZeroI2S_TX::begin() {
-  // Initialize I2S module from the ASF.
-  status_code res = i2s_init(&_i2s_instance, I2S);
-  if (res != STATUS_OK) {
-    DEBUG_PRINT("i2s_init failed with result: "); DEBUG_PRINTLN(res);
-    return false;
-  }
-  return true;
 }
 
-bool Adafruit_ZeroI2S_TX::configure(uint8_t numChannels, uint32_t sampleRateHz, uint8_t bitsPerSample) {
-  // Convert bit per sample int into explicit ASF values.
-  i2s_slot_size slot_size;
-  i2s_data_size data_size;
-  switch (bitsPerSample) {
-    case 8:
-      slot_size = I2S_SLOT_SIZE_8_BIT;
-      data_size = I2S_DATA_SIZE_8BIT;
-      break;
-    case 16:
-      slot_size = I2S_SLOT_SIZE_16_BIT;
-      data_size = I2S_DATA_SIZE_16BIT;
-      break;
-    case 24:
-      slot_size = I2S_SLOT_SIZE_24_BIT;
-      data_size = I2S_DATA_SIZE_24BIT;
-      break;
-    case 32:
-      slot_size = I2S_SLOT_SIZE_32_BIT;
-      data_size = I2S_DATA_SIZE_32BIT;
-      break;
-    default:
-      DEBUG_PRINTLN("Expected bits per sample to be 8, 16, 24, or 32!");
-      return false;
-  }
+void Adafruit_ZeroI2S::enableTx()
+{
+	I2S->CTRLA.bit.CKEN0 = 1;
+	while(I2S->SYNCBUSY.bit.CKEN0);
 
-  // Disable I2S while it is being reconfigured to prevent unexpected output.
-  i2s_disable(&_i2s_instance);
-
-  // Configure the GCLK generator that will drive the I2S clocks.  This clock
-  // will run at the SCK frequency by dividing the 48mhz main cpu clock.
-  struct system_gclk_gen_config gclk_generator;
-  // Load defaults for the clock generator.
-  system_gclk_gen_get_config_defaults(&gclk_generator);
-  // Set the clock generator to use the 48mhz main CPU clock and divide it down
-  // to the SCK frequency.
-  gclk_generator.source_clock = SYSTEM_CLOCK_SOURCE_DFLL;
-  gclk_generator.division_factor = F_CPU / (sampleRateHz*numChannels*bitsPerSample);
-  DEBUG_PRINT("I2S gclk divisor: "); DEBUG_PRINTLN(gclk_generator.division_factor, DEC);
-  // Set the GCLK generator config and enable it.
-  system_gclk_gen_set_config(_gclk, &gclk_generator);
-  system_gclk_gen_enable(_gclk);
-
-	// Configure I2S clock.
-  struct i2s_clock_unit_config i2s_clock_instance;
-	i2s_clock_unit_get_config_defaults(&i2s_clock_instance);
-  // Configure source GCLK for I2S peripheral.
-	i2s_clock_instance.clock.gclk_src = _gclk;
-  // Disable MCK output and set SCK to MCK value.
-	i2s_clock_instance.clock.mck_src = I2S_MASTER_CLOCK_SOURCE_GCLK;
-	i2s_clock_instance.clock.mck_out_enable = false;
-	i2s_clock_instance.clock.sck_src = I2S_SERIAL_CLOCK_SOURCE_MCKDIV;
-	i2s_clock_instance.clock.sck_div = 1;
-  // Configure number of channels and slot size (based on bits per sample).
-	i2s_clock_instance.frame.number_slots = numChannels;
-	i2s_clock_instance.frame.slot_size = slot_size;
-  // Configure 1-bit delay in each frame (I2S default).
-  i2s_clock_instance.frame.data_delay = I2S_DATA_DELAY_1;
-  // Configure FS generation from SCK clock.
-	i2s_clock_instance.frame.frame_sync.source = I2S_FRAME_SYNC_SOURCE_SCKDIV;
-  // Configure FS change on full slot change (I2S default).
-	i2s_clock_instance.frame.frame_sync.width = I2S_FRAME_SYNC_WIDTH_SLOT;
-	// Disable MCK pin output (unsupported on Zero).
-	i2s_clock_instance.mck_pin.enable = false;
-  // Enable SCK pin output on digital pin 1 (PA10).
-	i2s_clock_instance.sck_pin.enable = true;
-	i2s_clock_instance.sck_pin.gpio = PIN_PA10G_I2S_SCK0;
-	i2s_clock_instance.sck_pin.mux = MUX_PA10G_I2S_SCK0;
-  // Enable FS pin output on digital pin 0 (PA11).
-	i2s_clock_instance.fs_pin.enable = true;
-	i2s_clock_instance.fs_pin.gpio = PIN_PA11G_I2S_FS0;
-	i2s_clock_instance.fs_pin.mux = MUX_PA11G_I2S_FS0;
-  // Set clock configuration.
-	status_code res = i2s_clock_unit_set_config(&_i2s_instance, (i2s_clock_unit)_id, &i2s_clock_instance);
-  if (res != STATUS_OK) {
-    DEBUG_PRINT("i2s_clock_unit_set_config failed with result: "); DEBUG_PRINTLN(res);
-    return false;
-  }
-
-  // Configure I2S serializer.
-	struct i2s_serializer_config i2s_serializer_instance;
-	i2s_serializer_get_config_defaults(&i2s_serializer_instance);
-  // Configure clock unit to use with serializer, and set serializer as an output.
-	i2s_serializer_instance.clock_unit = (i2s_clock_unit)_id;
-	i2s_serializer_instance.mode = I2S_SERIALIZER_TRANSMIT;
-  // Configure serializer data size.
-	i2s_serializer_instance.data_size = data_size;
-  // Enable SD pin.  See Adafruit_ZeroI2S.h for default pin value.
-	i2s_serializer_instance.data_pin.enable = true;
-	i2s_serializer_instance.data_pin.gpio = I2S_SD_PIN;
-	i2s_serializer_instance.data_pin.mux = I2S_SD_MUX;
-	res = i2s_serializer_set_config(&_i2s_instance, (i2s_serializer)_id, &i2s_serializer_instance);
-  if (res != STATUS_OK) {
-    DEBUG_PRINT("i2s_serializer_set_config failed with result: "); DEBUG_PRINTLN(res);
-    return false;
-  }
-
-  // Enable everything configured above.
-  i2s_enable(&_i2s_instance);
-  i2s_clock_unit_enable(&_i2s_instance, (i2s_clock_unit)_id);
-  i2s_serializer_enable(&_i2s_instance, (i2s_serializer)_id);
-
-  return true;
+	I2S->CTRLA.bit.TXEN = 1;
+	while(I2S->SYNCBUSY.bit.TXEN);
 }
 
-void Adafruit_ZeroI2S_TX::write(uint32_t data) {
-  // Write the sample byte to the I2S data register.
-  // This will wait for the I2S hardware to be ready to receive the byte.
-  i2s_serializer_write_wait(&_i2s_instance, (i2s_serializer) _id, data);
+void Adafruit_ZeroI2S::disableTx()
+{
+	I2S->CTRLA.bit.TXEN = 0;
+	while(I2S->SYNCBUSY.bit.TXEN);
+}
+
+void Adafruit_ZeroI2S::enableRx(uint8_t clk)
+{
+	I2S->CTRLA.bit.CKEN0 = 1;
+	while(I2S->SYNCBUSY.bit.CKEN0);
+
+	I2S->CTRLA.bit.RXEN = 1;
+	while(I2S->SYNCBUSY.bit.RXEN);
+}
+
+void Adafruit_ZeroI2S::disableRx()
+{
+	I2S->CTRLA.bit.RXEN = 0;
+	while(I2S->SYNCBUSY.bit.RXEN);
+}
+
+void Adafruit_ZeroI2S::enableMCLK()
+{
+#ifdef PIN_I2S_MCK
+	pinPeripheral(PIN_I2S_MCK, PIO_I2S);
+#endif
+}
+
+void Adafruit_ZeroI2S::disableMCLK()
+{
+#ifdef PIN_I2S_MCK
+	pinMode(PIN_I2S_MCK, INPUT);
+#endif
+}
+
+bool Adafruit_ZeroI2S::txReady()
+{
+	return ((!I2S->INTFLAG.bit.TXRDY0) || I2S->SYNCBUSY.bit.TXDATA );
+}
+
+void Adafruit_ZeroI2S::write(int32_t left, int32_t right)
+{
+	while( (!I2S->INTFLAG.bit.TXRDY0) || I2S->SYNCBUSY.bit.TXDATA );
+	I2S->INTFLAG.bit.TXUR0 = 1;
+	I2S->TXDATA.reg = left;
+
+	while( (!I2S->INTFLAG.bit.TXRDY0) || I2S->SYNCBUSY.bit.TXDATA );
+	I2S->INTFLAG.bit.TXUR0 = 1;
+	I2S->TXDATA.reg = right;
+}
+
+void Adafruit_ZeroI2S::read(int32_t *left, int32_t *right)
+{
+	while( (!I2S->INTFLAG.bit.RXRDY0) || I2S->SYNCBUSY.bit.RXDATA );
+	*left = I2S->RXDATA.reg;
+
+	while( (!I2S->INTFLAG.bit.RXRDY0) || I2S->SYNCBUSY.bit.RXDATA );
+	*right = I2S->RXDATA.reg;
 }
