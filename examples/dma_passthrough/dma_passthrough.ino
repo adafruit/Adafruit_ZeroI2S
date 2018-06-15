@@ -104,10 +104,10 @@ void setup()
   txDMA.setCallback(dummy_callback);
   rxDMA.setCallback(dma_callback);
 
-  /* begin I2S on the default pins. 24 bit depth at
+  /* begin I2S on the default pins. 32 bit depth at
    * 44100 samples per second
    */
-  i2s.begin(I2S_24_BIT, 44100);
+  i2s.begin(I2S_32_BIT, 44100);
 
   /* uncomment this if your I2S device uses the MCLK line */
   //i2s.enableMCLK();

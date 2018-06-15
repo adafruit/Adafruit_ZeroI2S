@@ -185,12 +185,16 @@ void Adafruit_ZeroI2S::disableRx()
 
 void Adafruit_ZeroI2S::enableMCLK()
 {
+#ifdef PIN_I2S_MCK
 	pinPeripheral(PIN_I2S_MCK, PIO_I2S);
+#endif
 }
 
 void Adafruit_ZeroI2S::disableMCLK()
 {
+#ifdef PIN_I2S_MCK
 	pinMode(PIN_I2S_MCK, INPUT);
+#endif
 }
 
 bool Adafruit_ZeroI2S::txReady()
