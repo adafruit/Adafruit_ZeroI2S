@@ -55,7 +55,11 @@ Adafruit_ZeroI2S i2s;
 
 // Little define to make the native USB port on the Arduino Zero / Zero feather
 // the default for serial output.
+#if defined(__SAMD51__)
+#define Serial Serial
+#else
 #define Serial SerialUSB
+#endif
 
 
 void generateSine(uint16_t amplitude, int16_t* buffer, uint16_t length) {
