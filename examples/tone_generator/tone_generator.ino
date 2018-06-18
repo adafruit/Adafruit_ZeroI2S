@@ -15,11 +15,7 @@
 // - Digital 9 -> I2S DIN / SD (data output)
 // - Ground
 //
-// Depends on the Adafruit_ASFcore library from:
-//   https://github.com/adafruit/adafruit_asfcore
-//
 // Released under a MIT license: https://opensource.org/licenses/MIT
-#include "Adafruit_ASFCore.h"
 #include "Adafruit_ZeroI2S.h"
 
 
@@ -55,7 +51,7 @@ int16_t triangle[WAV_SIZE] = {0};
 int16_t square[WAV_SIZE]   = {0};
 
 // Create I2S audio transmitter object.
-Adafruit_ZeroI2S_TX i2s = Adafruit_ZeroI2S_TX();
+Adafruit_ZeroI2S i2s;
 
 // Little define to make the native USB port on the Arduino Zero / Zero feather
 // the default for serial output.
@@ -118,8 +114,7 @@ void playWave(int16_t* buffer, uint16_t length, float frequency, float seconds) 
     // Duplicate the sample so it's sent to both the left and right channel.
     // It appears the order is right channel, left channel if you want to write
     // stereo sound.
-    i2s.write(sample);
-    i2s.write(sample);
+    i2s.write(sample, sample);
   }
 }
 
@@ -129,19 +124,11 @@ void setup() {
   Serial.println("Zero I2S Audio Tone Generator");
 
   // Initialize the I2S transmitter.
-  if (!i2s.begin()) {
+  if (!i2s.begin(I2S_16_BIT, SAMPLERATE_HZ)) {
     Serial.println("Failed to initialize I2S transmitter!");
     while (1);
   }
-
-  // Configure I2S transmitter for stereo 16-bit audio at the desired sampling rate.
-  // Note it's important to use 2 channels for the MAX98357 I2S amp because it gets
-  // confused with just 1 channel and plays incorrect sounding audio.  For mono sound
-  // just use 2 channels and either duplicate or blank out the second channel sample.
-  if (!i2s.configure(2, SAMPLERATE_HZ, 16)) {
-    Serial.println("Failed to configure I2S transmitter for stereo 16-bit 44.1khz audio!");
-    while (1);
-  }
+  i2s.enableTx();
 
   // Generate waveforms.
   generateSine(AMPLITUDE, sine, WAV_SIZE);

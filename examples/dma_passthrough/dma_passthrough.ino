@@ -1,6 +1,8 @@
 /* This example shows how to pass data through using the
  *  ZeroI2S and ZeroDMA libraries.
  *  
+ *  This example is for M4 devices only
+ * 
  *  This uses a 24bit i2s slave device capable of both transmitting
  *  receiving data.
  *  
@@ -15,6 +17,10 @@
 #include <Adafruit_ZeroDMA.h>
 #include "utility/dma.h"
 #include <math.h>
+
+#ifndef __SAMD51__
+#error "this example is for SAMD51 devices only"
+#endif
 
 /* max volume for 24 bit data */
 #define VOLUME ( (1UL << 23) - 1)

@@ -3,15 +3,15 @@
 #include <Adafruit_ZeroI2S.h>
 #include <math.h>
 
-/* max volume for 24 bit data */
-#define VOLUME ( (1UL << 23) - 1)
+/* max volume for 32 bit data */
+#define VOLUME ( (1UL << 31) - 1)
 
 /* create a buffer for both the left and right channel data */
 #define BUFSIZE 128
 int left[BUFSIZE];
 int right[BUFSIZE];
 
-Adafruit_ZeroI2S i2s;
+Adafruit_ZeroI2S i2s(0, 1, 9, 2);
 
 void setup()
 {
@@ -26,7 +26,7 @@ void setup()
   /* begin I2S on the default pins. 24 bit depth at
    * 44100 samples per second
    */
-  i2s.begin(I2S_24_BIT, 44100);
+  i2s.begin(I2S_32_BIT, 44100);
   i2s.enableTx();
 }
 

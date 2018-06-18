@@ -33,7 +33,10 @@ public:
 	void read(int32_t *left, int32_t *right);
 
 private:
-	uint8_t _fs, _sck, _tx, _rx;
+	int8_t _fs, _sck, _tx, _rx;
+#ifndef __SAMD51__
+	int8_t _i2sserializer, _i2sclock;
+#endif
 };
 
 #endif

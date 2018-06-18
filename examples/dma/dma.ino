@@ -3,8 +3,8 @@
 #include "utility/dma.h"
 #include <math.h>
 
-/* max volume for 24 bit data */
-#define VOLUME ( (1UL << 23) - 1)
+/* max volume for 32 bit data */
+#define VOLUME ( (1UL << 31) - 1)
 
 /* create a buffer for both the left and right channel data */
 #define BUFSIZE 256
@@ -54,7 +54,11 @@ void setup()
   Serial.println("Setting up transfer");
     myDMA.addDescriptor(
       data,                    // move data from here
+#if defined(__SAMD51__)
       (void *)(&I2S->TXDATA.reg), // to here (M4)
+#else
+      (void *)(&I2S->DATA[0].reg), // to here (M0+)
+#endif
     BUFSIZE,                      // this many...
       DMA_BEAT_SIZE_WORD,               // bytes/hword/words
       true,                             // increment source addr?
@@ -66,7 +70,8 @@ void setup()
   /* begin I2S on the default pins. 24 bit depth at
    * 44100 samples per second
    */
-  i2s.begin(I2S_24_BIT, 44100);
+  i2s.begin(I2S_32_BIT, 44100);
+  i2s.enableTx();
 
   stat = myDMA.startJob();
 }
