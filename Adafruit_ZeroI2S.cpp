@@ -1,20 +1,72 @@
+/*!
+ * @file Adafruit_ZeroI2S.cpp
+ *
+ * @mainpage Adafruit I2S peripheral driver for SAMD21 and SAMD51 chips
+ *
+ * @section intro_sec Introduction
+ *
+ *  I2S peripheral driver for SAMD21 and SAMD51 chips
+ *
+ *    
+ *  Adafruit invests time and resources providing this open source code, 
+ *  please support Adafruit and open-source hardware by purchasing 
+ *  products from Adafruit!
+ *
+ * @section author Author
+ *
+ * Written by Dean Miller for Adafruit Industries.
+ *
+ * @section license License
+ *
+ * BSD license, all text here must be included in any redistribution.
+ *
+ */
+
 #include "Adafruit_ZeroI2S.h"
 #include "wiring_private.h"
 
 #ifndef DEBUG_PRINTLN
-#define DEBUG_PRINTLN Serial.println
+#define DEBUG_PRINTLN Serial.println ///< where to print the debug output
 #endif
 
+/**************************************************************************/
+/*! 
+    @brief  Class Constructor
+	@param FS_PIN frame sync pin
+	@param SCK_PIN bit clock pin
+	@param TX_PIN data output pin
+	@param RX_PIN data input pin
+*/
+/**************************************************************************/
 Adafruit_ZeroI2S::Adafruit_ZeroI2S(uint8_t FS_PIN, uint8_t SCK_PIN, uint8_t TX_PIN, uint8_t RX_PIN) : _fs(FS_PIN), _sck(SCK_PIN), _tx(TX_PIN), _rx(RX_PIN) {}
 
 #if defined(PIN_I2S_SDI) && defined(PIN_I2S_SDO)
+/**************************************************************************/
+/*! 
+    @brief  Class Constructor with defaults
+*/
+/**************************************************************************/
 Adafruit_ZeroI2S::Adafruit_ZeroI2S() : _fs(PIN_I2S_FS), _sck(PIN_I2S_SCK), _tx(PIN_I2S_SDO), _rx(PIN_I2S_SDI) {}
 #else
+/**************************************************************************/
+/*! 
+    @brief  Class Constructor with defaults
+*/
+/**************************************************************************/
 Adafruit_ZeroI2S::Adafruit_ZeroI2S() : _fs(PIN_I2S_FS), _sck(PIN_I2S_SCK), _tx(PIN_I2S_SD) {
 	_rx = -1;
 }
 #endif
 
+/**************************************************************************/
+/*! 
+    @brief  start up the I2S peripheral
+	@param width the width of each I2S frame
+	@param fs_freq the frame sync frequency (a.k.a. sample rate)
+	@param mck_mult master clock output will be fs_freq * mck_mult for chips that have a mclk.
+	@returns true on success, false on any error
+*/
+/**************************************************************************/
 bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 {
 #if defined(__SAMD51__)
@@ -239,6 +291,12 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief  enable data output. Note that on SAMD21 chips either rx or tx can be enabled on an Adafruit_ZeroI2S instance,
+	while on SAMD51 the same Adafruit_ZeroI2S instance can have both rx and tx channels enabled.
+*/
+/**************************************************************************/
 void Adafruit_ZeroI2S::enableTx()
 {
 #if defined(__SAMD51__)
@@ -268,6 +326,11 @@ void Adafruit_ZeroI2S::enableTx()
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief  disable data output
+*/
+/**************************************************************************/
 void Adafruit_ZeroI2S::disableTx()
 {
 #if defined(__SAMD51__)
@@ -277,6 +340,12 @@ void Adafruit_ZeroI2S::disableTx()
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief  enable data input. Note that on SAMD21 chips either rx or tx can be enabled on an Adafruit_ZeroI2S instance,
+	while on SAMD51 the same Adafruit_ZeroI2S instance can have both rx and tx channels enabled.
+*/
+/**************************************************************************/
 void Adafruit_ZeroI2S::enableRx()
 {
 #if defined(__SAMD51__)
@@ -306,6 +375,11 @@ void Adafruit_ZeroI2S::enableRx()
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief  disable data input
+*/
+/**************************************************************************/
 void Adafruit_ZeroI2S::disableRx()
 {
 #if defined(__SAMD51__)
@@ -315,6 +389,11 @@ void Adafruit_ZeroI2S::disableRx()
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief  enable master clock output on devices that have a master clock output.
+*/
+/**************************************************************************/
 void Adafruit_ZeroI2S::enableMCLK()
 {
 #ifdef PIN_I2S_MCK
@@ -322,6 +401,11 @@ void Adafruit_ZeroI2S::enableMCLK()
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief  disable master clock output on devices that have a master clock output.
+*/
+/**************************************************************************/
 void Adafruit_ZeroI2S::disableMCLK()
 {
 #ifdef PIN_I2S_MCK
@@ -329,6 +413,12 @@ void Adafruit_ZeroI2S::disableMCLK()
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief  check if data can be written to the TX data register
+	@returns true if data can be written, false otherwise
+*/
+/**************************************************************************/
 bool Adafruit_ZeroI2S::txReady()
 {
 #if defined(__SAMD51__)
@@ -346,6 +436,12 @@ bool Adafruit_ZeroI2S::txReady()
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief  check if data is available to be read from the RX data register
+	@returns true if data is available, false otherwise
+*/
+/**************************************************************************/
 bool Adafruit_ZeroI2S::rxReady()
 {
 #if defined(__SAMD51__)
@@ -363,6 +459,14 @@ bool Adafruit_ZeroI2S::rxReady()
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief perform a blocking write to the I2S peripheral. This function will only return once
+	all data has been sent.
+	@param left the left channel data
+	@param right the right channel data
+*/
+/**************************************************************************/
 void Adafruit_ZeroI2S::write(int32_t left, int32_t right)
 {
 #if defined(__SAMD51__)
@@ -397,6 +501,14 @@ void Adafruit_ZeroI2S::write(int32_t left, int32_t right)
 #endif
 }
 
+/**************************************************************************/
+/*! 
+    @brief perform a blocking read to the I2S peripheral. This function will only return once
+	all data has been read.
+	@param left pointer to where the left channel data will be written
+	@param right pointer to where the right channel data will be written
+*/
+/**************************************************************************/
 void Adafruit_ZeroI2S::read(int32_t *left, int32_t *right)
 {
 #if defined(__SAMD51__)
