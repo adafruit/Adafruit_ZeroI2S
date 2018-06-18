@@ -189,6 +189,13 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 
 	PM->APBCMASK.reg |= PM_APBCMASK_I2S;
 
+	I2S->CTRLA.bit.ENABLE = 0;
+	while(I2S->SYNCBUSY.bit.ENABLE);
+
+	if(_i2sclock == 0) I2S->CTRLA.bit.CKEN0 = 0;
+	else I2S->CTRLA.bit.CKEN1 = 0;
+	while(I2S->SYNCBUSY.bit.CKEN0 || I2S->SYNCBUSY.bit.CKEN1);
+
 	I2S->CLKCTRL[_i2sclock].reg = I2S_CLKCTRL_MCKSEL_GCLK |
 			I2S_CLKCTRL_SCKSEL_MCKDIV |
 			I2S_CLKCTRL_FSSEL_SCKDIV |
@@ -214,6 +221,11 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 			DEBUG_PRINTLN("invalid width!");
 			return false;
 	}
+
+	if(_i2sserializer == 0) I2S->CTRLA.bit.SEREN0 = 0;
+	else I2S->CTRLA.bit.SEREN1 = 0;
+	while(I2S->SYNCBUSY.bit.SEREN0 || I2S->SYNCBUSY.bit.SEREN1);
+	
 	I2S->SERCTRL[_i2sserializer].reg = I2S_SERCTRL_DMA_SINGLE |
 			I2S_SERCTRL_MONO_STEREO |
 			I2S_SERCTRL_BITREV_MSBIT |
@@ -222,19 +234,6 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 			I2S_SERCTRL_DATASIZE(wordSize) |
 			I2S_SERCTRL_SLOTADJ_RIGHT |
 			((uint32_t)_i2sclock << I2S_SERCTRL_CLKSEL_Pos);
-
-	/* Status check */
-	uint32_t ctrla = I2S->CTRLA.reg;
-	if (ctrla & I2S_CTRLA_ENABLE) {
-		if (ctrla & (I2S_CTRLA_SEREN1 |
-			 I2S_CTRLA_SEREN0 | I2S_CTRLA_CKEN1 | I2S_CTRLA_CKEN0)) {
-		  //return STATUS_BUSY;
-		  return false;
-		} else {
-		  //return STATUS_ERR_DENIED;
-		  return false;
-		}
-	}
 
 	return true;
 #endif
@@ -250,6 +249,9 @@ void Adafruit_ZeroI2S::enableTx()
 	while(I2S->SYNCBUSY.bit.TXEN);
 #else
 	if(_i2sserializer > -1 && _i2sclock > -1){
+		I2S->CTRLA.bit.ENABLE = 0;
+		while(I2S->SYNCBUSY.bit.ENABLE);
+		
 		I2S->SERCTRL[_i2sserializer].bit.SERMODE = I2S_SERCTRL_SERMODE_TX;
 		
 		if(_i2sserializer == 0) I2S->CTRLA.bit.SEREN0 = 1;
@@ -259,6 +261,9 @@ void Adafruit_ZeroI2S::enableTx()
 		else I2S->CTRLA.bit.CKEN1 = 1;
 
 		I2S->CTRLA.bit.ENABLE = 1;
+		while(I2S->SYNCBUSY.bit.ENABLE || I2S->SYNCBUSY.bit.CKEN0 || 
+			I2S->SYNCBUSY.bit.CKEN1 || I2S->SYNCBUSY.bit.SEREN0 ||
+			I2S->SYNCBUSY.bit.SEREN1);
 	}
 #endif
 }
@@ -272,7 +277,7 @@ void Adafruit_ZeroI2S::disableTx()
 #endif
 }
 
-void Adafruit_ZeroI2S::enableRx(uint8_t clk)
+void Adafruit_ZeroI2S::enableRx()
 {
 #if defined(__SAMD51__)
 	I2S->CTRLA.bit.CKEN0 = 1;
@@ -282,28 +287,21 @@ void Adafruit_ZeroI2S::enableRx(uint8_t clk)
 	while(I2S->SYNCBUSY.bit.RXEN);
 #else
 	if(_i2sserializer > -1 && _i2sclock > -1){
+		I2S->CTRLA.bit.ENABLE = 0;
+		while(I2S->SYNCBUSY.bit.ENABLE);
+		
 		I2S->SERCTRL[_i2sserializer].bit.SERMODE = I2S_SERCTRL_SERMODE_RX;
 		
-		if(_i2sserializer == 0){
-			I2S->CTRLA.bit.SEREN0 = 1;
-			while(I2S->SYNCBUSY.bit.SEREN0);
-		}
-		else {
-			I2S->CTRLA.bit.SEREN1 = 1;
-			while(I2S->SYNCBUSY.bit.SEREN1);
-		}
+		if(_i2sserializer == 0) I2S->CTRLA.bit.SEREN0 = 1;
+		else I2S->CTRLA.bit.SEREN1 = 1;
 
-		if(_i2sclock == 0){
-			I2S->CTRLA.bit.CKEN0 = 1;
-			while(I2S->SYNCBUSY.bit.CKEN0);
-		} 
-		else{
-			I2S->CTRLA.bit.CKEN1 = 1;
-			while(I2S->SYNCBUSY.bit.CKEN1);
-		}
+		if(_i2sclock == 0) I2S->CTRLA.bit.CKEN0 = 1;
+		else I2S->CTRLA.bit.CKEN1 = 1;
 
 		I2S->CTRLA.bit.ENABLE = 1;
-		while(I2S->SYNCBUSY.bit.ENABLE);
+		while(I2S->SYNCBUSY.bit.ENABLE || I2S->SYNCBUSY.bit.CKEN0 || 
+			I2S->SYNCBUSY.bit.CKEN1 || I2S->SYNCBUSY.bit.SEREN0 ||
+			I2S->SYNCBUSY.bit.SEREN1);
 	}
 #endif
 }
@@ -334,8 +332,34 @@ void Adafruit_ZeroI2S::disableMCLK()
 bool Adafruit_ZeroI2S::txReady()
 {
 #if defined(__SAMD51__)
-	return ((!I2S->INTFLAG.bit.TXRDY0) || I2S->SYNCBUSY.bit.TXDATA );
+	return !((!I2S->INTFLAG.bit.TXRDY0) || I2S->SYNCBUSY.bit.TXDATA );
 #else
+	if(_i2sserializer > -1) {
+		if(_i2sserializer == 0){
+			return !( (!I2S->INTFLAG.bit.TXRDY0) || I2S->SYNCBUSY.bit.DATA0 );
+		}
+		else{
+			return !( (!I2S->INTFLAG.bit.TXRDY1) || I2S->SYNCBUSY.bit.DATA1 );
+		}
+	}
+	else return false;
+#endif
+}
+
+bool Adafruit_ZeroI2S::rxReady()
+{
+#if defined(__SAMD51__)
+	return !( (!I2S->INTFLAG.bit.RXRDY0) || I2S->SYNCBUSY.bit.RXDATA );
+#else
+	if(_i2sserializer > -1) {
+		if(_i2sserializer == 0){
+			return !( (!I2S->INTFLAG.bit.RXRDY0) || I2S->SYNCBUSY.bit.DATA0 );
+		}
+		else{
+			return !( (!I2S->INTFLAG.bit.RXRDY1) || I2S->SYNCBUSY.bit.DATA1 );
+		}
+	}
+	else return false;
 #endif
 }
 

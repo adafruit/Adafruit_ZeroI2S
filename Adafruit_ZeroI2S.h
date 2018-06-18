@@ -22,7 +22,7 @@ public:
 
 	void enableTx();
 	void disableTx();
-	void enableRx(uint8_t clk=0);
+	void enableRx();
 	void disableRx();
 	void enableMCLK();
 	void disableMCLK();
