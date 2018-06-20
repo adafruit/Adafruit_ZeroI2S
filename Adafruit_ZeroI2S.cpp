@@ -81,20 +81,30 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 	//initialize clock control
 	MCLK->APBDMASK.reg |= MCLK_APBDMASK_I2S;
 
-	GCLK->PCHCTRL[I2S_GCLK_ID_0].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
-	GCLK->PCHCTRL[I2S_GCLK_ID_1].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+	uint32_t mckFreq = (fs_freq * mck_mult);
+	uint32_t sckFreq = fs_freq * I2S_NUM_SLOTS * ( (width + 1) << 3);
+
+	uint32_t gclkval = GCLK_PCHCTRL_GEN_GCLK1_Val;
+	uint32_t gclkFreq = VARIANT_GCLK1_FREQ;
+	uint8_t mckoutdiv = min( (gclkFreq/mckFreq) - 1, 63);
+	uint8_t mckdiv = min( (gclkFreq/sckFreq) - 1, 63 );
+
+	if(((VARIANT_GCLK1_FREQ/mckFreq) - 1) > 63){
+		gclkval = GCLK_PCHCTRL_GEN_GCLK4_Val;
+		gclkFreq = 12000000;
+	}
+
+	GCLK->PCHCTRL[I2S_GCLK_ID_0].reg = gclkval | (1 << GCLK_PCHCTRL_CHEN_Pos);
+	GCLK->PCHCTRL[I2S_GCLK_ID_1].reg = gclkval | (1 << GCLK_PCHCTRL_CHEN_Pos);
 
 	//software reset
 	I2S->CTRLA.bit.SWRST = 1;
 	while(I2S->SYNCBUSY.bit.SWRST || I2S->SYNCBUSY.bit.ENABLE); //wait for sync
 
-	uint32_t mckFreq = (fs_freq * mck_mult);
-	uint32_t sckFreq = fs_freq * I2S_NUM_SLOTS * ( (width + 1) << 3);
-
 	//CLKCTRL[0] is used for the tx channel
 	I2S->CLKCTRL[0].reg = I2S_CLKCTRL_MCKSEL_GCLK |
-			I2S_CLKCTRL_MCKOUTDIV( (VARIANT_GCLK1_FREQ/mckFreq) - 1) |
-			I2S_CLKCTRL_MCKDIV((VARIANT_GCLK1_FREQ/sckFreq) - 1) |
+			I2S_CLKCTRL_MCKOUTDIV(mckoutdiv) |
+			I2S_CLKCTRL_MCKDIV(mckdiv) |
 			I2S_CLKCTRL_SCKSEL_MCKDIV |
 			I2S_CLKCTRL_MCKEN |
 			I2S_CLKCTRL_FSSEL_SCKDIV |
