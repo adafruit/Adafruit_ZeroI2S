@@ -16,13 +16,7 @@ ZeroDMAstatus    stat; // DMA status codes returned by some functions
 Adafruit_ZeroI2S i2s;
 
 void dma_callback(Adafruit_ZeroDMA *dma) {
-  /* we will simply restart the transfer here, but
-   * you could do something else like swap the
-   * output buffer to a different one that contains
-   * data processed while your DMA was happening
-   * in the background.
-   */
-  myDMA.startJob();
+  /* we don't need to do anything here */
 }
 
 void setup()
@@ -63,7 +57,7 @@ void setup()
       DMA_BEAT_SIZE_WORD,               // bytes/hword/words
       true,                             // increment source addr?
       false);
-
+  myDMA.loop(true);
   Serial.println("Adding callback");
   myDMA.setCallback(dma_callback);
 
@@ -81,4 +75,3 @@ void loop()
   Serial.println("do other things here while your DMA runs in the background.");
   delay(2000);
 }
-

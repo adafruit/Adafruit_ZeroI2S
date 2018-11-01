@@ -48,24 +48,6 @@ Adafruit_ZeroI2S i2s;
 
 void dummy_callback(Adafruit_ZeroDMA *dma) { } //do nothing
 
-/* This will get called when a buffer of data has been received.
- * It will swap the RX and TX buffers.
- */
-void dma_callback(Adafruit_ZeroDMA *dma) {
-  if(txBuf == ping){
-    txDMA.changeDescriptor(txDesc, pong);
-    rxDMA.changeDescriptor(rxDesc, NULL, ping);
-    txBuf = pong;
-  }
-  else{
-    txDMA.changeDescriptor(txDesc, ping);
-    rxDMA.changeDescriptor(rxDesc, NULL, pong);
-    txBuf = ping;
-  }
-  txDMA.startJob();
-  rxDMA.startJob();
-}
-
 void setup()
 {
   Serial.begin(115200);
@@ -94,6 +76,17 @@ void setup()
     DMA_BEAT_SIZE_WORD,           // bytes/hword/words
     true,                         // increment source addr?
     false);
+  txDesc->BTCTRL.bit.BLOCKACT = DMA_BLOCK_ACTION_INT;
+
+  txDesc = txDMA.addDescriptor(
+    pong,                       // move data from here
+    (void *)(&I2S->TXDATA.reg),   // to here
+    BUFSIZE,                      // this many...
+    DMA_BEAT_SIZE_WORD,           // bytes/hword/words
+    true,                         // increment source addr?
+    false);
+  txDesc->BTCTRL.bit.BLOCKACT = DMA_BLOCK_ACTION_INT;
+  txDMA.loop(true);
 
   //this will be the initial tx buffer
   txBuf = ping;
@@ -105,10 +98,21 @@ void setup()
     DMA_BEAT_SIZE_WORD,           // bytes/hword/words
     false,                        // increment source addr?
     true);
+  rxDesc->BTCTRL.bit.BLOCKACT = DMA_BLOCK_ACTION_INT;
+  
+  rxDesc = rxDMA.addDescriptor(
+    (void *)(&I2S->RXDATA.reg),   // move data from here
+    ping,               // to here
+    BUFSIZE,                      // this many...
+    DMA_BEAT_SIZE_WORD,           // bytes/hword/words
+    false,                        // increment source addr?
+    true);
+  rxDesc->BTCTRL.bit.BLOCKACT = DMA_BLOCK_ACTION_INT;
+  rxDMA.loop(true);
 
   Serial.println("Adding callbacks");
   txDMA.setCallback(dummy_callback);
-  rxDMA.setCallback(dma_callback);
+  rxDMA.setCallback(dummy_callback);
 
   /* begin I2S on the default pins. 32 bit depth at
    * 44100 samples per second
@@ -116,7 +120,7 @@ void setup()
   i2s.begin(I2S_32_BIT, 44100);
 
   /* uncomment this if your I2S device uses the MCLK line */
-  //i2s.enableMCLK();
+  i2s.enableMCLK();
 
   /* enable transmit and receive channels */
   i2s.enableTx();
