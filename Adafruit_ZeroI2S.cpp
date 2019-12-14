@@ -268,16 +268,16 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult)
 	uint8_t wordSize;
 	switch(width){
 		case I2S_8_BIT:
-			wordSize = I2S_SERCTRL_DATASIZE_8;
+			wordSize = I2S_SERCTRL_DATASIZE_8_Val;
 			break;
 		case I2S_16_BIT:
-			wordSize = I2S_SERCTRL_DATASIZE_16;
+			wordSize = I2S_SERCTRL_DATASIZE_16_Val;
 			break;
 		case I2S_24_BIT:
-			wordSize = I2S_SERCTRL_DATASIZE_24;
+			wordSize = I2S_SERCTRL_DATASIZE_24_Val;
 			break;
 		case I2S_32_BIT:
-			wordSize = I2S_SERCTRL_DATASIZE_32;
+			wordSize = I2S_SERCTRL_DATASIZE_32_Val;
 			break;
 		default:
 			DEBUG_PRINTLN("invalid width!");
