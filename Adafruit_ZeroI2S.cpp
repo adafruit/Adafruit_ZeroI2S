@@ -161,16 +161,20 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult) {
     _i2sclock = 0;
     _clk_pin = PIN_PA10G_I2S_SCK0;
     _clk_mux = MUX_PA10G_I2S_SCK0;
+#if defined(PIN_PB11G_I2S_SCK1)
   } else if ((clockport == 1) && (clockpin == 10)) {
     // PB11
     _i2sclock = 1;
     _clk_pin = PIN_PB11G_I2S_SCK1;
     _clk_mux = MUX_PB11G_I2S_SCK1;
+#endif
+#if defined(PIN_PA20G_I2S_SCK0)
   } else if ((clockport == 0) && (clockpin == 20)) {
     // PA20
     _i2sclock = 0;
     _clk_pin = PIN_PA20G_I2S_SCK0;
     _clk_mux = MUX_PA20G_I2S_SCK0;
+#endif
   } else {
     DEBUG_PRINTLN("Clock isnt on a valid pin");
     return false;
@@ -184,10 +188,12 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult) {
     // PA11
     _fs_pin = PIN_PA11G_I2S_FS0;
     _fs_mux = MUX_PA11G_I2S_FS0;
+#if defined(PIN_PA21G_I2S_FS0)
   } else if ((fsport == 0) && (fspin == 21)) {
     // PA20
     _fs_pin = PIN_PA21G_I2S_FS0;
     _fs_mux = MUX_PA21G_I2S_FS0;
+#endif
   } else {
     DEBUG_PRINTLN("FS isnt on a valid pin");
     return false;

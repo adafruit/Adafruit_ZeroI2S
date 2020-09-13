@@ -11,10 +11,15 @@
 int left[BUFSIZE];
 int right[BUFSIZE];
 
-Adafruit_ZeroI2S i2s(0, 1, 9, 2);
+// Use default pins in board variant
+Adafruit_ZeroI2S i2s = Adafruit_ZeroI2S();
 
 void setup()
 {
+  while (!Serial) delay(10);
+
+  Serial.println("I2S demo");
+
   for(int i=0; i<BUFSIZE; i++){
       /* create a sine wave on the left channel */
         left[i] = sin( (2*PI / (BUFSIZE) ) * i) * VOLUME;
