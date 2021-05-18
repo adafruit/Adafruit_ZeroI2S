@@ -162,7 +162,7 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult) {
     _clk_pin = PIN_PA10G_I2S_SCK0;
     _clk_mux = MUX_PA10G_I2S_SCK0;
 #if defined(PIN_PB11G_I2S_SCK1)
-  } else if ((clockport == 1) && (clockpin == 10)) {
+  } else if ((clockport == 1) && (clockpin == 11)) {
     // PB11
     _i2sclock = 1;
     _clk_pin = PIN_PB11G_I2S_SCK1;
@@ -190,7 +190,7 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult) {
     _fs_mux = MUX_PA11G_I2S_FS0;
 #if defined(PIN_PA21G_I2S_FS0)
   } else if ((fsport == 0) && (fspin == 21)) {
-    // PA20
+    // PA21
     _fs_pin = PIN_PA21G_I2S_FS0;
     _fs_mux = MUX_PA21G_I2S_FS0;
 #endif
