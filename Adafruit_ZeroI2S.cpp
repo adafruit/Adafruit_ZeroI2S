@@ -77,7 +77,7 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult) {
 
   pinPeripheral(_fs, PIO_I2S);
   pinPeripheral(_sck, PIO_I2S);
-  pinPeripheral(_rx, PIO_I2S);
+  if(_rx != -1) pinPeripheral(_rx, PIO_I2S);
   pinPeripheral(_tx, PIO_I2S);
 
   I2S->CTRLA.bit.ENABLE = 0;
