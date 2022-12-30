@@ -68,7 +68,7 @@ Adafruit_ZeroI2S::Adafruit_ZeroI2S()
         @param width the width of each I2S frame
         @param fs_freq the frame sync frequency (a.k.a. sample rate)
         @param mck_mult master clock output will be fs_freq * mck_mult for chips
-   that have a mclk.
+   that have a mclk. This should be a multiple of the width.
         @returns true on success, false on any error
 */
 /**************************************************************************/
@@ -86,18 +86,58 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult) {
   // initialize clock control
   MCLK->APBDMASK.reg |= MCLK_APBDMASK_I2S;
 
-  uint32_t mckFreq = (fs_freq * mck_mult);
-  uint32_t sckFreq = fs_freq * I2S_NUM_SLOTS * ((width + 1) << 3);
+  // This is the size of an I2S frame: one sample at the given bit
+  // width for every I2S slot (in stereo, the "slots" are the left and
+  // right channels).
+  uint32_t frameSize = I2S_NUM_SLOTS * ((width + 1) << 3);
 
+  // We need to set up two I2S clocks, MCK and SCK, using the SAMD51's
+  // available GCLKs and the two clock dividers it provides for this
+  // purpose, mckoutdiv and mckdiv (somewhat unhelpfully named).
+
+  // This is the correct frequency we'd ideally like to run MCK at:
+  // mck_mult ticks per sample, fs_freq samples per second.
+  uint32_t nominalMckFreq = (fs_freq * mck_mult);
+
+  // And we'd ideally like to run SCK at frameSize ticks per sample,
+  // fs_freq samples per second.
+
+  // But without an external clock, we'll have to make do with the
+  // GCLKs provided by the SAMD51. We can set a divider, mckoutdiv, to
+  // get as close as possible to nominalMckFreq as we can using an int
+  // divider.
   uint32_t gclkval = GCLK_PCHCTRL_GEN_GCLK1_Val;
   uint32_t gclkFreq = VARIANT_GCLK1_FREQ;
-  uint8_t mckoutdiv = min((gclkFreq / mckFreq) - 1, 63);
-  uint8_t mckdiv = min((gclkFreq / sckFreq) - 1, 63);
-
-  if (((VARIANT_GCLK1_FREQ / mckFreq) - 1) > 63) {
+  uint32_t mckoutdiv =
+      max(round(static_cast<double>(gclkFreq) / nominalMckFreq), 1);
+  if (mckoutdiv > 64) {
+    // 64 is the max, so we'll have to start from a slower GCLK.
     gclkval = GCLK_PCHCTRL_GEN_GCLK4_Val;
     gclkFreq = 12000000;
+    mckoutdiv = min(round(static_cast<double>(gclkFreq) / nominalMckFreq), 64);
   }
+
+  // mckoutdiv divides the GCLK to get our real MCK frequency
+  // uint32_t realMckFreq = gclkFreq / mckoutdiv;
+
+  // Note that because our real clock rates are only an approximation
+  // of the nominal rate, our real sample rate is only an
+  // approximation of fs_freq. Here's how you would calculate the
+  // actual rate:
+  // float realFsFreq = static_cast<double>(realMckFreq) / mck_mult;
+
+  // mckdiv also divides the GCLK, to get our real SCK frequency. To
+  // work well, it needs to divide evenly into the MCK frequency. This
+  // is only possible if mck_mult (MCK's ticks per sample) is
+  // divisible by frameSize (SCK's ticks per sample), so users should
+  // choose mck_mult and width accordingly.
+
+  // Instead of dividing GCLK into mck_mult ticks per sample as
+  // mckoutdiv does, mckdiv divides it into frameSize ticks per
+  // sample. This is equivalent to directly dividing gclkFreq by
+  // (realFsFreq * frameSize), but avoids using the (possibly
+  // non-integer) realFsFreq.
+  uint32_t mckdiv = (mckoutdiv * mck_mult) / frameSize;
 
   GCLK->PCHCTRL[I2S_GCLK_ID_0].reg = gclkval | (1 << GCLK_PCHCTRL_CHEN_Pos);
   GCLK->PCHCTRL[I2S_GCLK_ID_1].reg = gclkval | (1 << GCLK_PCHCTRL_CHEN_Pos);
@@ -109,8 +149,8 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult) {
 
   // CLKCTRL[0] is used for the tx channel
   I2S->CLKCTRL[0].reg =
-      I2S_CLKCTRL_MCKSEL_GCLK | I2S_CLKCTRL_MCKOUTDIV(mckoutdiv) |
-      I2S_CLKCTRL_MCKDIV(mckdiv) | I2S_CLKCTRL_SCKSEL_MCKDIV |
+      I2S_CLKCTRL_MCKSEL_GCLK | I2S_CLKCTRL_MCKOUTDIV(mckoutdiv - 1) |
+      I2S_CLKCTRL_MCKDIV(mckdiv - 1) | I2S_CLKCTRL_SCKSEL_MCKDIV |
       I2S_CLKCTRL_MCKEN | I2S_CLKCTRL_FSSEL_SCKDIV | I2S_CLKCTRL_BITDELAY_I2S |
       I2S_CLKCTRL_FSWIDTH_HALF | I2S_CLKCTRL_NBSLOTS(I2S_NUM_SLOTS - 1) |
       I2S_CLKCTRL_SLOTSIZE(width);
