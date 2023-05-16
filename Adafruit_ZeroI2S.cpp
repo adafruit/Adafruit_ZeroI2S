@@ -109,12 +109,12 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult) {
   uint32_t gclkval = GCLK_PCHCTRL_GEN_GCLK1_Val;
   uint32_t gclkFreq = VARIANT_GCLK1_FREQ;
   uint32_t mckoutdiv =
-      max(round(static_cast<double>(gclkFreq) / nominalMckFreq), 1);
+      max((gclkFreq + (nominalMckFreq / 2)) / nominalMckFreq, 1);
   if (mckoutdiv > 64) {
     // 64 is the max, so we'll have to start from a slower GCLK.
     gclkval = GCLK_PCHCTRL_GEN_GCLK4_Val;
     gclkFreq = 12000000;
-    mckoutdiv = min(round(static_cast<double>(gclkFreq) / nominalMckFreq), 64);
+    mckoutdiv = min((gclkFreq + (nominalMckFreq / 2)) / nominalMckFreq, 64);
   }
 
   // mckoutdiv divides the GCLK to get our real MCK frequency
@@ -124,7 +124,7 @@ bool Adafruit_ZeroI2S::begin(I2SSlotSize width, int fs_freq, int mck_mult) {
   // of the nominal rate, our real sample rate is only an
   // approximation of fs_freq. Here's how you would calculate the
   // actual rate:
-  // float realFsFreq = static_cast<double>(realMckFreq) / mck_mult;
+  // float realFsFreq = static_cast<float>(realMckFreq) / mck_mult;
 
   // mckdiv also divides the GCLK, to get our real SCK frequency. To
   // work well, it needs to divide evenly into the MCK frequency. This
